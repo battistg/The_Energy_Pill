@@ -2,6 +2,13 @@
 pages/analytics.py  — Analytics (Beta / Demo)
 """
 
+import sys
+import os
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 import streamlit as st
 import pandas as pd
 import numpy as np
