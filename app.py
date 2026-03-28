@@ -79,32 +79,51 @@ COMMODITIES = {
 
 
 @st.cache_data(ttl=28800, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner=False)  # 30 min cache (più "real-time")
 def fetch_all_prices():
-    results = {}
-    for key, meta in COMMODITIES.items():
-        try:
-            resp = requests.get(
-                BASE_URL,
-                params={"function": meta["function"], "interval": "monthly", "apikey": API_KEY},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            series   = [d for d in data.get("data", []) if d.get("value") not in (".", "", None)]
-            latest   = float(series[0]["value"]) if len(series) >= 1 else None
-            previous = float(series[1]["value"]) if len(series) >= 2 else None
-            date     = series[0].get("date", "")  if series else ""
-        except Exception:
-            latest = previous = date = None
 
-        change     = (latest - previous)       if (latest and previous) else None
+    TICKERS = {
+        "WTI": "CL=F",
+        "BRENT": "BZ=F",
+        "NATURAL_GAS": "NG=F",
+    }
+
+    results = {}
+
+    for key, ticker in TICKERS.items():
+        meta = COMMODITIES[key]
+
+        try:
+            data = yf.download(
+                ticker,
+                period="2d",       # ultimi 2 giorni
+                interval="1d",     # daily close
+                progress=False,
+            )
+
+            if data.empty or len(data) < 1:
+                raise ValueError("No data")
+
+            latest = float(data["Close"].iloc[-1])
+            previous = float(data["Close"].iloc[-2]) if len(data) > 1 else None
+            date = data.index[-1].strftime("%d %b %Y")
+
+        except Exception:
+            latest = previous = None
+            date = ""
+
+        change = (latest - previous) if (latest and previous) else None
         change_pct = (change / previous * 100) if (change and previous) else None
 
         results[key] = {
             **meta,
-            "price": latest, "previous": previous,
-            "change": change, "change_pct": change_pct, "date": date,
+            "price": latest,
+            "previous": previous,
+            "change": change,
+            "change_pct": change_pct,
+            "date": date,
         }
+
     return results
 
 
